@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Opportunity Navigator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1b1f24;--mut:#6b7280;--bd:#e3e6ea;--ac:#0f766e;--acb:#d9f2ef;--dg:#b42318;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14171a;--card:#1d2125;--tx:#e8eaed;--mut:#9aa3ad;--bd:#2c3238;--ac:#4fd1c5;--acb:#173a37;--dg:#f97066}}
+:root[data-theme="dark"]{--bg:#14171a;--card:#1d2125;--tx:#e8eaed;--mut:#9aa3ad;--bd:#2c3238;--ac:#4fd1c5;--acb:#173a37;--dg:#f97066}
+html,body{height:100%;margin:0}body{background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+*{box-sizing:border-box}
+.app{display:grid;grid-template-columns:270px 1fr;height:100%}
+aside{border-right:1px solid var(--bd);padding:14px;overflow:auto;background:var(--card)}
+main{overflow:auto;padding:18px;max-width:100%}
+h1{font-size:17px;margin:0 0 10px}
+input,textarea,select{width:100%;font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:7px 9px}
+input:focus,textarea:focus,select:focus{outline:2px solid var(--ac);outline-offset:-1px}
+textarea{resize:vertical}
+button{font:inherit;cursor:pointer;color:var(--tx)}
+.btn{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:7px 12px}
+.btn:hover{border-color:var(--ac)}.pri{background:var(--ac);color:#fff;border-color:var(--ac);width:100%;margin:8px 0}
+.sm{padding:4px 9px;font-size:13px;margin-top:6px;display:inline-block}
+.it{display:block;width:100%;text-align:left;background:none;border:1px solid transparent;border-radius:8px;padding:8px 10px;margin-top:4px}
+.it small{display:block;color:var(--mut)}.it.on{background:var(--acb);border-color:var(--ac)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:14px}
+.eq{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px}
+.eq label{flex:1;min-width:150px}.eq i{font-style:normal;font-size:20px;color:var(--mut);padding-bottom:6px}.eq b{color:var(--ac);padding-bottom:7px}
+label,.lab{display:block;font-size:12px;color:var(--mut);font-weight:600;margin-top:8px}
+label input,label select{margin-top:3px;color:var(--tx);font-weight:400;font-size:15px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.sh,.fl{display:flex;gap:8px;align-items:center}
+.st{font-size:16px;font-weight:700;border-color:transparent;background:none;padding-left:0}
+.lb{font-weight:600;border-color:transparent;background:none;padding-left:0;font-size:14px}
+.st:hover,.lb:hover{border-color:var(--bd)}
+.x,.del{background:none;border:0;color:var(--mut);font-size:13px;white-space:nowrap}.x:hover,.del:hover{color:var(--dg)}
+.f{margin:8px 0 14px}
+.tags{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:3px}
+.tg{background:var(--acb);color:var(--tx);border-radius:999px;padding:2px 4px 2px 10px;font-size:13px;font-weight:400}
+.tg button{background:none;border:0;color:var(--mut)}
+.ti{flex:1;min-width:140px;width:auto}
+.tw{overflow-x:auto}table{border-collapse:collapse;min-width:100%}th,td{padding:2px;min-width:130px}
+th input{font-weight:600}th button,td button{background:none;border:0;color:var(--mut)}
+.fs{list-style:none;padding:0;margin:0}.fs li{display:flex;gap:10px;align-items:center;padding:3px 0}
+.fs a{color:var(--ac);word-break:break-all}small,.mut{color:var(--mut);font-size:13px}
+.up{cursor:pointer;margin-top:6px;font-weight:400}
+.add{display:flex;gap:8px;border-top:1px dashed var(--bd);padding-top:10px}.add select{width:auto}
+.empty{text-align:center;color:var(--mut);margin-top:20vh}
+#bar{font-size:12px;color:var(--mut);margin-bottom:8px;min-height:16px}
+@media(max-width:720px){.app{grid-template-columns:1fr;grid-template-rows:auto 1fr}aside{border-right:0;border-bottom:1px solid var(--bd);max-height:34vh}.g2{grid-template-columns:1fr}}
+</style></head>
+<body><div class="app">
+<aside><h1>🧭 Opportunity Navigator</h1>
+<button class="btn pri" data-a="newopp">+ New opportunity</button>
+<input id="q" placeholder="Search…" oninput="renderList()">
+<div id="list"></div></aside>
+<main><div id="bar"></div><div id="main"></div></main></div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Math.random().toString(36).slice(2,9);
+let db=null,assets=null,opps=[],cur=null,timer=null;
+const F=(label,type,x)=>({id:uid(),label,type,value:type=='tags'||type=='table'||type=='files'?[]:'',...(x||{})});
+const cols=(...n)=>({cols:n.map(name=>({id:uid(),name}))});
+const template=()=>[
+ {id:uid(),title:'Sector analysis',fields:[F('Sector overview','long'),F('Market size & growth','long'),F('Trends & drivers','long'),F('Regulations & standards','long')]},
+ {id:uid(),title:'Problem, user & customer',fields:[F('Problem statement','long'),F('User (who uses it)','long'),F('Customer (who pays)','long'),F('Pain points','tags')]},
+ {id:uid(),title:'Stakeholders',fields:[F('Stakeholder map','table',cols('Name','Role','Interest','Influence'))]},
+ {id:uid(),title:'Competitors',fields:[F('Competitor landscape','table',cols('Company','Offering','Strengths','Weaknesses'))]},
+ {id:uid(),title:'Primary data',fields:[F('Interviews, surveys, field notes','long'),F('Files','files')]},
+ {id:uid(),title:'Secondary data',fields:[F('Reports & sources','long'),F('Files','files')]}];
+const newOpp=()=>({id:uid(),application:'',customer:'',sector:'',status:'Idea',capabilities:[],customers:[],sections:template(),created:Date.now(),updatedAt:Date.now()});
+const secOf=s=>cur.sections.find(x=>x.id==s);
+const fld=(s,f)=>secOf(s).fields.find(x=>x.id==f);
+const arr=el=>el.dataset.h?cur[el.dataset.h]:fld(el.dataset.s,el.dataset.f).value;
+function setS(t){$('#bar').textContent=t}
+function doSave(o){if(!o)return;setS('Saving…');(async()=>{try{if(!db)throw 0;await db.collection('opps').doc(o.id).set(JSON.parse(JSON.stringify(o)));setS('All changes saved')}catch(e){setS('Not saved — open this page signed in with edit access')}})()}
+function save(){if(!cur)return;cur.updatedAt=Date.now();setS('Saving…');clearTimeout(timer);const o=cur;timer=setTimeout(()=>{timer=null;doSave(o)},600)}
+function flush(){if(timer){clearTimeout(timer);timer=null;doSave(cur)}}
+function tags(a,d){return `<div class="tags">${a.map((t,i)=>`<span class="tg">${esc(t)}<button data-a="deltag" ${d} data-i="${i}">×</button></span>`).join('')}<input class="ti" data-k="tagin" ${d} placeholder="Type &amp; press Enter"></div>`}
+function table(f,d){return `<div class="tw"><table><thead><tr>${f.cols.map(c=>`<th><input data-k="col" ${d} data-c="${c.id}" value="${esc(c.name)}"></th>`).join('')}<th></th></tr><tr>${f.cols.map(c=>`<th><button data-a="delcol" ${d} data-c="${c.id}">remove col</button></th>`).join('')}<th></th></tr></thead><tbody>${f.value.map(r=>`<tr>${f.cols.map(c=>`<td><input data-k="cell" ${d} data-r="${r.id}" data-c="${c.id}" value="${esc(r.d[c.id])}"></td>`).join('')}<td><button data-a="delrow" ${d} data-r="${r.id}">×</button></td></tr>`).join('')}</tbody></table></div><button class="btn sm" data-a="addrow" ${d}>+ Row</button> <button class="btn sm" data-a="addcol" ${d}>+ Column</button>`}
+function files(f,d){return `<ul class="fs">${f.value.map(x=>`<li><a href="${esc(x.url)}" target="_blank" rel="noopener">📎 ${esc(x.name)}</a><small>${Math.max(1,Math.round(x.size/1024))} KB</small><button class="x" data-a="delfile" ${d} data-id="${x.id}">✕</button></li>`).join('')}</ul>${assets?`<label class="btn sm up">+ Upload files<input type="file" multiple hidden data-k="up" ${d}></label> <small>PDF, CSV, images, text · Excel sheets are saved as CSV</small>`:'<p class="mut">Uploads unavailable in this view.</p>'}`}
+function field(s,f){const d=`data-s="${s.id}" data-f="${f.id}"`;let b;
+ if(f.type=='long')b=`<textarea data-k="v" ${d} rows="4">${esc(f.value)}</textarea>`;
+ else if(f.type=='text')b=`<input data-k="v" ${d} value="${esc(f.value)}">`;
+ else if(f.type=='tags')b=tags(f.value,d);else if(f.type=='table')b=table(f,d);else b=files(f,d);
+ return `<div class="f"><div class="fl"><input class="lb" data-k="lbl" ${d} value="${esc(f.label)}"><button class="x" data-a="delf" ${d}>Delete field</button></div>${b}</div>`}
+const sec=s=>`<section class="card"><div class="sh"><input class="st" data-k="st" data-s="${s.id}" value="${esc(s.title)}"><button class="x" data-a="delsec" data-s="${s.id}">Delete section</button></div>${s.fields.map(f=>field(s,f)).join('')}<div class="add"><select id="t_${s.id}"><option value="long">Long text</option><option value="text">Short text</option><option value="tags">Tag list</option><option value="table">Table</option><option value="files">Files</option></select><button class="btn" data-a="addf" data-s="${s.id}">+ Add field</button></div></section>`;
+const head=()=>`<div class="card"><div class="eq"><label>Application<input data-k="h" data-h="application" value="${esc(cur.application)}" placeholder="What we would build / offer"></label><i>+</i><label>Customer<input data-k="h" data-h="customer" value="${esc(cur.customer)}" placeholder="Who needs it"></label><i>=</i><b>Opportunity</b></div>
+<div class="g2"><label>Sector<input data-k="h" data-h="sector" value="${esc(cur.sector)}"></label><label>Status<select data-k="h" data-h="status">${['Idea','Researching','Validated','Parked'].map(s=>`<option${cur.status==s?' selected':''}>${s}</option>`).join('')}</select></label></div>
+<div class="lab">Capabilities that led to this application</div>${tags(cur.capabilities,'data-h="capabilities"')}
+<div class="lab">Potential customers</div>${tags(cur.customers,'data-h="customers"')}</div>`;
+function renderList(){const q=($('#q').value||'').toLowerCase();$('#list').innerHTML=opps.filter(o=>[o.application,o.customer,o.sector].join(' ').toLowerCase().includes(q)).map(o=>`<button class="it${cur&&cur.id==o.id?' on':''}" data-a="sel" data-id="${o.id}"><b>${esc(o.application||'Untitled')}</b><small>${esc(o.customer||'—')} · ${esc(o.status)}</small></button>`).join('')||'<p class="mut">No opportunities yet.</p>'}
+function renderMain(){$('#main').innerHTML=cur?`<p style="text-align:right;margin:0 0 10px"><button class="btn" data-a="pdf">⬇ Download as PDF</button></p>`+head()+cur.sections.map(sec).join('')+`<button class="btn" data-a="addsec">+ Add section</button><p><button class="del" data-a="delopp">Delete this opportunity</button></p>`:'<div class="empty"><h2>No opportunity selected</h2><p>Create one to start capturing research.</p></div>'}
+const render=()=>{renderList();renderMain()};
+document.addEventListener('input',e=>{const t=e.target,D=t.dataset,k=D.k;if(!cur||!k)return;
+ if(k=='h'){cur[D.h]=t.value;renderList()}else if(k=='st')secOf(D.s).title=t.value;
+ else if(k=='v')fld(D.s,D.f).value=t.value;else if(k=='lbl')fld(D.s,D.f).label=t.value;
+ else if(k=='col')fld(D.s,D.f).cols.find(c=>c.id==D.c).name=t.value;
+ else if(k=='cell')fld(D.s,D.f).value.find(r=>r.id==D.r).d[D.c]=t.value;else return;save()});
+document.addEventListener('keydown',e=>{const t=e.target;if(t.dataset.k=='tagin'&&e.key=='Enter'&&t.value.trim()){const key=t.dataset.h||t.dataset.f;arr(t).push(t.value.trim());save();renderMain();const n=document.querySelector(`.ti[data-h="${key}"],.ti[data-f="${key}"]`);n&&n.focus()}});
+document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(!b)return;const D=b.dataset,a=D.a;
+ if(['delsec','delf','delopp','delcol','delfile'].includes(a)&&!D.arm){D.arm=1;const o=b.textContent;b.textContent='Sure? Click again';setTimeout(()=>{D.arm='';b.textContent=o},2500);return}
+ if(a=='newopp'){flush();cur=newOpp();opps.unshift(cur);save();render();return}
+ if(a=='sel'){flush();cur=opps.find(o=>o.id==D.id);render();return}
+ if(a=='delopp'){const id=cur.id;db&&db.collection('opps').doc(id).delete().catch(()=>{});opps=opps.filter(o=>o.id!=id);cur=opps[0]||null;render();return}
+ if(a=='pdf'){makePdf();return}
+ if(!cur)return;
+ if(a=='addsec')cur.sections.push({id:uid(),title:'New section',fields:[]});
+ else if(a=='delsec')cur.sections=cur.sections.filter(s=>s.id!=D.s);
+ else if(a=='addf'){const ty=document.getElementById('t_'+D.s).value;secOf(D.s).fields.push(F('New field',ty,ty=='table'?cols('Column 1','Column 2'):{}))}
+ else if(a=='delf'){const s=secOf(D.s);s.fields=s.fields.filter(f=>f.id!=D.f)}
+ else if(a=='addrow')fld(D.s,D.f).value.push({id:uid(),d:{}});
+ else if(a=='delrow'){const f=fld(D.s,D.f);f.value=f.value.filter(r=>r.id!=D.r)}
+ else if(a=='addcol')fld(D.s,D.f).cols.push({id:uid(),name:'Column'});
+ else if(a=='delcol'){const f=fld(D.s,D.f);f.cols=f.cols.filter(c=>c.id!=D.c)}
+ else if(a=='deltag')arr(b).splice(+D.i,1);
+ else if(a=='delfile'){const f=fld(D.s,D.f);assets&&assets.delete(D.id).catch(()=>{});f.value=f.value.filter(x=>x.id!=D.id)}
+ else return;save();renderMain()});
+async function prep(file){const n=file.name,ext=n.split('.').pop().toLowerCase();
+ if(['xlsx','xls','xlsm'].includes(ext)){if(!window.XLSX)throw{message:'Excel converter not loaded'};const wb=XLSX.read(await file.arrayBuffer());return wb.SheetNames.map(s=>({name:n.replace(/\.\w+$/,'')+' - '+s+'.csv',blob:new Blob([XLSX.utils.sheet_to_csv(wb.Sheets[s])],{type:'text/csv'})}))}
+ const ty={pdf:'application/pdf',csv:'text/csv',txt:'text/plain',md:'text/markdown',json:'application/json'}[ext];return [{name:n,blob:ty?new Blob([file],{type:ty}):file}]}
+document.addEventListener('change',async e=>{const t=e.target;if(t.dataset.k!='up')return;const f=fld(t.dataset.s,t.dataset.f),o=cur;setS('Uploading…');let err='';
+ for(const file of [...t.files]){try{for(const x of await prep(file)){const r=await assets.upload(x.blob);f.value.push({id:r.id,name:x.name,url:'/_blob/'+r.id,size:x.blob.size})}}catch(ex){err+=` ${file.name}: ${ex.message||ex.code||'failed'} (try PDF/CSV/image).`}}
+ cur=o;o.updatedAt=Date.now();doSave(o);renderMain();if(err)setS(err)});
+async function makePdf(){
+ if(!cur)return;if(!window.jspdf){setS('PDF tools failed to load');return}
+ const doc=new window.jspdf.jsPDF({unit:'pt',format:'a4'}),W=doc.internal.pageSize.getWidth(),H=doc.internal.pageSize.getHeight(),M=48,mw=W-2*M;let y=M;
+ const need=h=>{if(y+h>H-M){doc.addPage();y=M}};
+ const txt=(t,sz,b,col,gap)=>{doc.setFont('helvetica',b?'bold':'normal');doc.setFontSize(sz);doc.setTextColor(...(col||[35,35,35]));for(const l of doc.splitTextToSize(String(t||'-'),mw)){need(sz*1.35);doc.text(l,M,y+sz);y+=sz*1.35}y+=gap||0};
+ const TEAL=[15,118,110];
+ txt((cur.application||'Untitled')+'  +  '+(cur.customer||'-'),20,1,TEAL,2);
+ txt('Sector: '+(cur.sector||'-')+'   |   Status: '+cur.status+'   |   Exported: '+new Date().toLocaleDateString(),9,0,[110,110,110],10);
+ txt('Capabilities that led to this application',10,1,[80,80,80]);txt(cur.capabilities.join(', '),11,0,null,6);
+ txt('Potential customers',10,1,[80,80,80]);txt(cur.customers.join(', '),11,0,null,8);
+ for(const s of cur.sections){need(60);y+=8;doc.setDrawColor(...TEAL);doc.setLineWidth(1.2);doc.line(M,y,W-M,y);y+=4;txt(s.title,14,1,TEAL,4);
+  for(const f of s.fields){need(40);txt(f.label,10.5,1,[60,60,60]);
+   if(f.type=='table'){if(f.value.length){doc.autoTable({startY:y,margin:{left:M,right:M},theme:'grid',head:[f.cols.map(c=>c.name)],body:f.value.map(r=>f.cols.map(c=>r.d[c.id]||'')),styles:{fontSize:9,cellPadding:4},headStyles:{fillColor:TEAL}});y=doc.lastAutoTable.finalY+10}else txt('-',10.5,0,null,6)}
+   else if(f.type=='tags')txt(f.value.join(', '),10.5,0,null,8);
+   else if(f.type=='files')txt(f.value.length?f.value.map(x=>'- '+x.name).join('\n'):'-',10,0,null,8);
+   else txt(f.value,10.5,0,null,8)}}
+ const n=doc.getNumberOfPages();for(let i=1;i<=n;i++){doc.setPage(i);doc.setFontSize(8);doc.setTextColor(130);doc.text('Page '+i+' of '+n,W/2,H-24,{align:'center'})}
+ const name=((cur.application||'opportunity')+' - '+(cur.customer||'')).replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'_')+'.pdf';
+ try{const dl=await claude.use('downloads');if(!dl)throw 0;await dl.save({filename:name,data:doc.output('blob')});setS('PDF ready')}catch(e){setS(e&&e.code=='declined'?'Download cancelled':'Download not available in this view')}
+}
+render();
+if(window.claude){
+ claude.use('assets').then(a=>{assets=a;if(cur)renderMain()}).catch(()=>{});
+ claude.use('db').then(d=>{db=d;if(!d){setS('Not signed in — changes will not be saved');return}
+  d.collection('opps').onSnapshot(s=>{opps=s.docs.map(x=>({...x.data(),id:x.id})).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+   if(cur&&!opps.find(o=>o.id==cur.id))opps.unshift(cur);
+   if(!cur&&opps.length){cur=opps[0];renderMain()}
+   else if(cur&&!timer){const n=opps.find(o=>o.id==cur.id);if(n&&n!==cur&&n.updatedAt!=cur.updatedAt){cur=n;renderMain()}}
+   renderList()},()=>setS('Could not load saved data'))}).catch(()=>{});
+}
+</script></body></html>
