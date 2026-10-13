@@ -54,7 +54,7 @@ th input{font-weight:600}th button,td button{background:none;border:0;color:var(
 <aside><h1>🧭 Opportunity Navigator</h1>
 <button class="btn pri" data-a="newopp">+ New opportunity</button>
 <input id="q" placeholder="Search…" oninput="renderList()">
-<div id="list"></div></aside>
+<div id="list"></div><p><button class="btn sm" data-a="perm">Permissions</button></p></aside>
 <main><div id="bar"></div><div id="main"></div></main></div>
 <script>
 const $=s=>document.querySelector(s);
@@ -75,7 +75,7 @@ const secOf=s=>cur.sections.find(x=>x.id==s);
 const fld=(s,f)=>secOf(s).fields.find(x=>x.id==f);
 const arr=el=>el.dataset.h?cur[el.dataset.h]:fld(el.dataset.s,el.dataset.f).value;
 function setS(t){$('#bar').textContent=t}
-function doSave(o){if(!o)return;setS('Saving…');(async()=>{try{if(!db)throw 0;await db.collection('opps').doc(o.id).set(JSON.parse(JSON.stringify(o)));setS('All changes saved')}catch(e){setS('Not saved — open this page signed in with edit access')}})()}
+function doSave(o){if(!o)return;setS('Saving…');(async()=>{try{localStorage.setItem('opp_'+o.id,JSON.stringify(o))}catch(e){}try{if(!db)throw {message:'database not connected'};await db.collection('opps').doc(o.id).set(JSON.parse(JSON.stringify(o)));setS('All changes saved')}catch(e){setS('Saved in this browser only. Cloud save failed: '+((e&&(e.code||e.message))||'unknown'))}})()}
 function save(){if(!cur)return;cur.updatedAt=Date.now();setS('Saving…');clearTimeout(timer);const o=cur;timer=setTimeout(()=>{timer=null;doSave(o)},600)}
 function flush(){if(timer){clearTimeout(timer);timer=null;doSave(cur)}}
 function tags(a,d){return `<div class="tags">${a.map((t,i)=>`<span class="tg">${esc(t)}<button data-a="deltag" ${d} data-i="${i}">×</button></span>`).join('')}<input class="ti" data-k="tagin" ${d} placeholder="Type &amp; press Enter"></div>`}
@@ -104,8 +104,9 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(!b
  if(['delsec','delf','delopp','delcol','delfile'].includes(a)&&!D.arm){D.arm=1;const o=b.textContent;b.textContent='Sure? Click again';setTimeout(()=>{D.arm='';b.textContent=o},2500);return}
  if(a=='newopp'){flush();cur=newOpp();opps.unshift(cur);save();render();return}
  if(a=='sel'){flush();cur=opps.find(o=>o.id==D.id);render();return}
- if(a=='delopp'){const id=cur.id;db&&db.collection('opps').doc(id).delete().catch(()=>{});opps=opps.filter(o=>o.id!=id);cur=opps[0]||null;render();return}
+ if(a=='delopp'){const id=cur.id;try{localStorage.removeItem('opp_'+id)}catch(e){}db&&db.collection('opps').doc(id).delete().catch(()=>{});opps=opps.filter(o=>o.id!=id);cur=opps[0]||null;render();return}
  if(a=='pdf'){makePdf();return}
+ if(a=='perm'){if(!window.claude){setS('Permissions only work on the claude.ai artifact link');return}claude.use('permissions').then(p=>p&&p.manage()).catch(()=>setS('Open the artifact menu and choose Permissions'));return}
  if(!cur)return;
  if(a=='addsec')cur.sections.push({id:uid(),title:'New section',fields:[]});
  else if(a=='delsec')cur.sections=cur.sections.filter(s=>s.id!=D.s);
@@ -142,17 +143,19 @@ async function makePdf(){
    else txt(f.value,10.5,0,null,8)}}
  const n=doc.getNumberOfPages();for(let i=1;i<=n;i++){doc.setPage(i);doc.setFontSize(8);doc.setTextColor(130);doc.text('Page '+i+' of '+n,W/2,H-24,{align:'center'})}
  const name=((cur.application||'opportunity')+' - '+(cur.customer||'')).replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'_')+'.pdf';
- try{const dl=await claude.use('downloads');if(!dl)throw 0;await dl.save({filename:name,data:doc.output('blob')});setS('PDF ready')}catch(e){setS(e&&e.code=='declined'?'Download cancelled':'Download not available in this view')}
+ try{const dl=window.claude?await claude.use('downloads'):null;if(!dl){doc.save(name);setS('PDF downloaded');return}await dl.save({filename:name,data:doc.output('blob')});setS('PDF ready')}catch(e){setS(e&&e.code=='declined'?'Download cancelled':'Download failed: '+((e&&(e.code||e.message))||'not available in this view')+'. Try the Permissions button.')}
 }
+try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k.startsWith('opp_'))opps.push(JSON.parse(localStorage.getItem(k)))}}catch(e){}
+opps.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));cur=opps[0]||null;
 render();
+if(!window.claude)setS('This page is running outside Claude, so it saves in this browser only. Open the claude.ai artifact link for cloud saving.');
 if(window.claude){
  claude.use('assets').then(a=>{assets=a;if(cur)renderMain()}).catch(()=>{});
- claude.use('db').then(d=>{db=d;if(!d){setS('Not signed in — changes will not be saved');return}
-  d.collection('opps').onSnapshot(s=>{opps=s.docs.map(x=>({...x.data(),id:x.id})).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+ claude.use('db').then(d=>{db=d;if(!d){setS('Cloud saving is not available in this view. Saving in this browser only. Try the Permissions button.');return}
+  d.collection('opps').onSnapshot(s=>{const rem=s.docs.map(x=>({...x.data(),id:x.id})),ids=new Set(rem.map(o=>o.id)),loc=opps.filter(o=>!ids.has(o.id));loc.forEach(o=>doSave(o));opps=rem.concat(loc).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
    if(cur&&!opps.find(o=>o.id==cur.id))opps.unshift(cur);
    if(!cur&&opps.length){cur=opps[0];renderMain()}
    else if(cur&&!timer){const n=opps.find(o=>o.id==cur.id);if(n&&n!==cur&&n.updatedAt!=cur.updatedAt){cur=n;renderMain()}}
    renderList()},()=>setS('Could not load saved data'))}).catch(()=>{});
 }
 </script></body></html>
-
